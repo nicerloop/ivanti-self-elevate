@@ -12,7 +12,7 @@ Manager.
 >
 > When enabled, Self-Elevation can be used to run (selected) applications with Administrator privileges. Generally, this functionality is only exposed from Windows Explorer. Using this module, it is possible to call this component directly (with arbitrary arguments).
 
-The C# class is reused as-is, a simplistic `Main` method is added to launch the program.
+The C# class is reused as-is, a wrapper `Main` method is added to launch the program, that additionally ensures the required services are running when attempting to invoke the privileges elevation, then restores their original state.
 
 ## Usage
 
@@ -22,7 +22,7 @@ It is meant to be compatible with [gsudo](https://github.com/gerardog/gsudo) as 
 
 ```
 $> gsudo -v
-ivanti-gsudo 0.0.1
+ivanti-gsudo 0.0.2
 ```
 
 ### Cache

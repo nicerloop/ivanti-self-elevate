@@ -2,6 +2,11 @@ using System;
 using System.Text;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
+using System.Collections.Generic;
+using System.Collections.Concurrent;
+using System.ServiceProcess;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace AMShellIntegration
 {
@@ -15,20 +20,98 @@ namespace AMShellIntegration
                 {
                     case "-v":
                     case "-V":
-                        Console.WriteLine("ivanti-gsudo 0.0.1");
+                        Console.WriteLine("ivanti-gsudo 0.0.2");
                         return;
                     case "cache":
                     case "-k":
                     case "-K":
-                        Console.WriteLine("Info: No cache inplemented.");
+                        Console.WriteLine("Info: No cache implemented.");
                         return;
                     default:
+                        var serviceTimeoutSeconds = 30;
+                        var waitAfterSeconds = 5;
+                        var startedServices = StartServices(serviceTimeoutSeconds, waitAfterSeconds, "AppSense Application Manager Agent", "AppSense Client Communications Agent");
                         var FilePath = args[0];
                         var CommandLine = (args.Length > 1) ? String.Join(" ", new ArraySegment<string>(args, 1, args.Length - 1)) : null;
                         AMShellIntegration.AMShellContextMenu.InvokeCommand(FilePath, CommandLine);
+                        StopServices(serviceTimeoutSeconds, waitAfterSeconds, startedServices);
                         return;
                 }
             }
+        }
+
+        private static string[] StartServices(int serviceTimeoutSeconds, int waitAfterSeconds, params string[] serviceNames)
+        {
+            var startedServices = new ConcurrentBag<string>();
+            var tasks = new List<Task>();
+            foreach (var serviceName in serviceNames)
+            {
+                var task = Task.Factory.StartNew(() =>
+                {
+                    try
+                    {
+                        using (var sc = new ServiceController(serviceName))
+                        {
+                            if (sc.Status != ServiceControllerStatus.Running)
+                            {
+                                Console.WriteLine("Starting service " + serviceName);
+                                sc.Start();
+                                sc.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(serviceTimeoutSeconds));
+                                startedServices.Add(serviceName);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("Warning: Could not start service " + serviceName + ": " + ex.Message);
+                    }
+                });
+                tasks.Add(task);
+            }
+            Task.WaitAll(tasks.ToArray());
+            if (startedServices.Count > 0 && waitAfterSeconds > 0)
+            {
+                Console.WriteLine("Waiting " + waitAfterSeconds + " seconds after starting services...");
+                Thread.Sleep(waitAfterSeconds * 1000);
+            }
+            return startedServices.ToArray();
+        }
+
+        private static string[] StopServices(int serviceTimeoutSeconds, int waitAfterSeconds, params string[] serviceNames)
+        {
+            var stoppedServices = new ConcurrentBag<string>();
+            var tasks = new List<Task>();
+            foreach (var serviceName in serviceNames)
+            {
+                var task = Task.Factory.StartNew(() =>
+                {
+                    try
+                    {
+                        using (var sc = new ServiceController(serviceName))
+                        {
+                            if (sc.Status == ServiceControllerStatus.Running)
+                            {
+                                Console.WriteLine("Stopping service " + serviceName);
+                                sc.Stop();
+                                sc.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(serviceTimeoutSeconds));
+                                stoppedServices.Add(serviceName);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("Warning: Could not stop service " + serviceName + ": " + ex.Message);
+                    }
+                });
+                tasks.Add(task);
+            }
+            Task.WaitAll(tasks.ToArray());
+            if (stoppedServices.Count > 0 && waitAfterSeconds > 0)
+            {
+                Console.WriteLine("Waiting " + waitAfterSeconds + " seconds after stopping services...");
+                Thread.Sleep(waitAfterSeconds * 1000);
+            }
+            return stoppedServices.ToArray();
         }
 
         private const string Verb = "AppSenseSelfElevate";
