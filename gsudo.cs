@@ -29,12 +29,12 @@ namespace AMShellIntegration
                         return;
                     default:
                         var serviceTimeoutSeconds = 30;
-                        var waitAfterSeconds = 5;
+                        var waitAfterSeconds = 10;
                         var startedServices = StartServices(serviceTimeoutSeconds, waitAfterSeconds, "AppSense Application Manager Agent", "AppSense Client Communications Agent");
                         var FilePath = args[0];
                         var CommandLine = (args.Length > 1) ? String.Join(" ", new ArraySegment<string>(args, 1, args.Length - 1)) : null;
                         AMShellIntegration.AMShellContextMenu.InvokeCommand(FilePath, CommandLine);
-                        StopServices(serviceTimeoutSeconds, waitAfterSeconds, startedServices);
+                        StopServices(serviceTimeoutSeconds, 0, startedServices);
                         return;
                 }
             }
